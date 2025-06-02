@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VirtualSmart Mirror</title>
+    <meta http-equiv="refresh" content="3600"> <!-- Refresh every hour -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="mirror-container">
+        <header>
+            <h1>VirtualSmart Mirror</h1>
+        </header>
+        
+        <div class="datetime-container">
+            <h2 class="time">{{ datetime.time }}</h2>
+            <p class="date">{{ datetime.date }}</p>
+        </div>
+        
+        <div class="weather-container">
+            <div class="current-weather">
+                <h3>{{ weather.location }}, {{ weather.country }}</h3>
+                <div class="weather-info">
+                    <img src="http://openweathermap.org/img/wn/{{ weather.current.icon }}@2x.png" alt="{{ weather.current.condition }}">
+                    <div class="weather-details">
+                        <p class="temp">{{ weather.current.temp }}°C</p>
+                        <p class="condition">{{ weather.current.description|title }}</p>
+                    </div>
+                </div>
+                <div class="weather-stats">
+                    <div class="stat">
+                        <span class="stat-icon">💧</span>
+                        <span class="stat-value">{{ weather.current.humidity }}%</span>
+                        <span class="stat-label">Humidity</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">💨</span>
+                        <span class="stat-value">{{ weather.current.wind_speed }} m/s</span>
+                        <span class="stat-label">{{ weather.current.wind_direction }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">☁️</span>
+                        <span class="stat-value">{{ weather.current.clouds }}%</span>
+                        <span class="stat-label">Clouds</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">🌧️</span>
+                        <span class="stat-value">{{ weather.current.rain|default:"0" }} mm</span>
+                        <span class="stat-label">Rain</span>
+                    </div>
+                </div>
+                <div class="sun-times">
+                    <div class="sunrise">
+                        <span class="sun-icon">🌅</span>
+                        <span class="sun-time">{{ weather.current.sunrise }}</span>
+                    </div>
+                    <div class="sunset">
+                        <span class="sun-icon">🌇</span>
+                        <span class="sun-time">{{ weather.current.sunset }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="forecast-container">
+                <h4>10-Day Forecast</h4>
+                <div class="forecast">
+                    {% for day in weather.forecast %}
+                    <div class="forecast-day">
+                        <p class="forecast-date">{{ day.date }}</p>
+                        <img src="http://openweathermap.org/img/wn/{{ day.icon }}.png" alt="{{ day.condition }}">
+                        <p class="forecast-temp">{{ day.temp_max }}° / {{ day.temp_min }}°</p>
+                        <p class="forecast-condition">{{ day.description|title }}</p>
+                        <div class="forecast-details">
+                            <p><span>💧</span> {{ day.humidity }}%</p>
+                            <p><span>🌧️</span> {{ day.pop }}%</p>
+                            <p><span>💨</span> {{ day.wind_speed }} m/s</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="location-form">
+                <form method="post" action="{% url 'update_location' %}">
+                    {% csrf_token %}
+                    <input type="text" name="location" id="locationInput" placeholder="Enter city name" required>
+                    <button type="submit">Update Location</button>
+                    <button type="button" id="getCurrentLocation" class="location-btn">Use Current Location</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="news-container">
+            <h3>News for {{ weather.location }}</h3>
+            <ul>
+                {% for article in news %}
+                <li>
+                    <a href="{{ article.url }}" target="_blank" class="news-link">
+                        <p class="news-title">{{ article.title }}</p>
+                        <p class="news-description">{{ article.description }}</p>
+                        <div class="news-meta">
+                            <small class="news-source">{{ article.source }}</small>
+                            {% if article.publishedAt %}
+                            <small class="news-date">{{ article.publishedAt|slice:":10" }}</small>
+                            {% endif %}
+                        </div>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        
+        <div class="quote-container">
+            <blockquote>
+                {{ quote.text }}
+                <footer>— {{ quote.author }}</footer>
+            </blockquote>
+        </div>
+        
+        <!-- Calendar Preview Section -->
+        <div class="calendar-preview">
+            <h3>Upcoming Events</h3>
+            <div class="calendar-events-preview">
+                {% if calendar.events %}
+                    <ul>
+                        {% for event in calendar.events|slice:":3" %}
+                        <li class="{% if event.is_today %}event-today{% elif event.is_past %}event-past{% endif %} priority-{{ event.priority }}">
+                            <div class="event-header">
+                                <p class="event-title">{{ event.title }}</p>
+                                {% if event.priority == 'high' %}<span class="priority-badge">High</span>{% endif %}
+                            </div>
+                            <p class="event-time">{{ event.date }} {% if event.time %}at {{ event.time }}{% endif %}</p>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="no-events">No upcoming events</p>
+                {% endif %}
+            </div>
+            <a href="{% url 'calendar' %}" class="view-calendar-btn">
+                <span class="calendar-icon">📅</span> View Calendar Events
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // Geolocation detection
+        document.getElementById('getCurrentLocation').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    // Send coordinates to backend to get location name
+                    fetch(`/get-location-by-coords/?lat=${position.coords.latitude}&lon=${position.coords.longitude}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.location) {
+                                document.getElementById('locationInput').value = data.location;
+                                // Auto-submit the form
+                                document.querySelector('.location-form form').submit();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching location:', error);
+                            alert('Could not determine your location. Please enter it manually.');
+                        });
+                }, function(error) {
+                    console.error('Geolocation error:', error);
+                    alert('Could not access your location. Please enter it manually.');
+                });
+            } else {
+                alert('Geolocation is not supported by your browser. Please enter your location manually.');
+            }
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Events - VirtualSmart Mirror</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="mirror-container">
+        <header>
+            <h1>Calendar Events</h1>
+            <a href="{% url 'index' %}" class="back-to-home">
+                <span class="weather-icon">🌤️</span> Back to Weather
+            </a>
+        </header>
+        
+        <div class="datetime-container">
+            <h2 class="time">{{ datetime.time }}</h2>
+            <p class="date">{{ datetime.date }}</p>
+        </div>
+        
+        <div class="calendar-container">
+            <h3><i class="calendar-icon">📅</i> Calendar Events</h3>
+            <div class="calendar-controls">
+                <button class="add-event-btn" onclick="openEventForm()">+ Add Event</button>
+            </div>
+            <div class="calendar-events">
+                {% if calendar.events %}
+                    <ul>
+                        {% for event in calendar.events %}
+                        <li class="{% if event.is_today %}event-today{% elif event.is_past %}event-past{% endif %} priority-{{ event.priority }}">
+                            <div class="event-actions">
+                                <button class="event-action-btn edit-btn" onclick="openEventForm('{{ event.id }}')">✏️</button>
+                                <button class="event-action-btn delete-btn" onclick="deleteEvent('{{ event.id }}')">🗑️</button>
+                            </div>
+                            <div class="event-header">
+                                <p class="event-title">{{ event.title }}</p>
+                                <p class="event-date">{{ event.date }} {% if event.time %} • {{ event.time }}{% endif %}</p>
+                            </div>
+                            {% if event.description %}
+                            <p class="event-description">{{ event.description }}</p>
+                            {% endif %}
+                            {% if event.location %}
+                            <p class="event-location"><i class="location-icon">📍</i> {{ event.location }}</p>
+                            {% endif %}
+                            <p class="event-priority">Priority: {{ event.priority|title }}</p>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="no-events">No upcoming events. Click "Add Event" to create one.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="quote-container">
+            <blockquote>
+                {{ quote.text }}
+                <footer>— {{ quote.author }}</footer>
+            </blockquote>
+        </div>
+        
+        <!-- Event Form Modal -->
+        <div id="eventFormModal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeEventForm()">&times;</span>
+                <h3 id="eventFormTitle">Add New Event</h3>
+                <form id="eventForm" method="post" action="/event/save/">
+                    {% csrf_token %}
+                    <input type="hidden" id="eventId" name="event_id" value="">
+                    <input type="hidden" name="redirect_to" value="calendar">
+                    
+                    <div class="form-group">
+                        <label for="eventTitle">Title *</label>
+                        <input type="text" id="eventTitle" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventDescription">Description</label>
+                        <textarea id="eventDescription" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventLocation">Location</label>
+                        <input type="text" id="eventLocation" name="location">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventStartDate">Start Date *</label>
+                        <input type="date" id="eventStartDate" name="start_date" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventStartTime">Start Time</label>
+                        <input type="time" id="eventStartTime" name="start_time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventEndDate">End Date</label>
+                        <input type="date" id="eventEndDate" name="end_date">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventEndTime">End Time</label>
+                        <input type="time" id="eventEndTime" name="end_time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eventPriority">Priority</label>
+                        <select id="eventPriority" name="priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="eventAllDay" name="all_day">
+                            All Day Event
+                        </label>
+                    </div>
+                    
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="eventReminder" name="reminder">
+                            Set Reminder
+                        </label>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" onclick="closeEventForm()">Cancel</button>
+                        <button type="submit" class="save-btn">Save Event</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <script>
+            // Calendar event form handling
+            function openEventForm(eventId = null) {
+                const modal = document.getElementById('eventFormModal');
+                const form = document.getElementById('eventForm');
+                const formTitle = document.getElementById('eventFormTitle');
+                
+                // Reset form
+                form.reset();
+                document.getElementById('eventId').value = '';
+                
+                if (eventId) {
+                    // Edit existing event
+                    formTitle.textContent = 'Edit Event';
+                    document.getElementById('eventId').value = eventId;
+                    
+                    // Fetch event data
+                    fetch(`/event/${eventId}/`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! Status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            // Populate form fields with event data
+                            document.getElementById('eventTitle').value = data.title;
+                            document.getElementById('eventDescription').value = data.description || '';
+                            document.getElementById('eventLocation').value = data.location || '';
+                            document.getElementById('eventStartDate').value = data.start_date;
+                            
+                            if (data.start_time) {
+                                document.getElementById('eventStartTime').value = data.start_time.substring(0, 5);
+                            }
+                            
+                            if (data.end_date) {
+                                document.getElementById('eventEndDate').value = data.end_date;
+                            }
+                            
+                            if (data.end_time) {
+                                document.getElementById('eventEndTime').value = data.end_time.substring(0, 5);
+                            }
+                            
+                            document.getElementById('eventAllDay').checked = data.all_day;
+                            document.getElementById('eventPriority').value = data.priority;
+                            document.getElementById('eventReminder').checked = data.reminder;
+                            
+                            // Toggle time fields based on all-day status
+                            toggleTimeFields(data.all_day);
+                        })
+                        .catch(error => {
+                            console.error('Error fetching event data:', error);
+                            alert('Error loading event data. Please try again.');
+                            closeEventForm();
+                        });
+                } else {
+                    // New event
+                    formTitle.textContent = 'Add New Event';
+                    
+                    // Set default date to today
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    document.getElementById('eventStartDate').value = `${yyyy}-${mm}-${dd}`;
+                    
+                    // Default to medium priority
+                    document.getElementById('eventPriority').value = 'medium';
+                }
+                
+                modal.style.display = 'block';
+            }
+            
+            // Add form submission handler to prevent default and handle via AJAX
+            document.addEventListener('DOMContentLoaded', function() {
+                const eventForm = document.getElementById('eventForm');
+                if (eventForm) {
+                    eventForm.addEventListener('submit', function(e) {
+                        // Let the form submit normally - we'll use the server-side redirect
+                        // No need to prevent default
+                    });
+                }
+            });
+            
+            function closeEventForm() {
+                document.getElementById('eventFormModal').style.display = 'none';
+            }
+            
+            function toggleTimeFields(isAllDay) {
+                const timeFields = document.querySelectorAll('input[type="time"]');
+                timeFields.forEach(field => {
+                    field.disabled = isAllDay;
+                });
+            }
+            
+            function deleteEvent(eventId) {
+                if (!eventId) return;
+                
+                if (confirm('Are you sure you want to delete this event?')) {
+                    fetch(`/event/${eventId}/delete/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Reload page to show updated calendar
+                            window.location.reload();
+                        }
+                    });
+                }
+            }
+            
+            // Toggle time fields when all-day checkbox changes
+            document.addEventListener('DOMContentLoaded', function() {
+                const allDayCheckbox = document.getElementById('eventAllDay');
+                if (allDayCheckbox) {
+                    allDayCheckbox.addEventListener('change', function() {
+                        toggleTimeFields(this.checked);
+                    });
+                }
+            });
+            
+            // Close modal when clicking outside
+            window.onclick = function(event) {
+                const modal = document.getElementById('eventFormModal');
+                if (event.target == modal) {
+                    closeEventForm();
+                }
+            }
+        </script>
+    </div>
+</body>
+</html>
+
+
+
+
+
+
+
+

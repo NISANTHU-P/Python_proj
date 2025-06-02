@@ -1,0 +1,9 @@
+django
+djangorestframework
+requests
+google-api-python-client
+python-dotenv
+djongo
+pymongo
+dnspython
+
